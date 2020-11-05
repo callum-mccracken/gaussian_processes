@@ -1,25 +1,12 @@
 import pandas
 import pickle
 import numpy as np
-import sympy as sp
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from matplotlib.ticker import MultipleLocator
-import matplotlib.gridspec as gridspec
 import sys
 import os
 from tqdm import tqdm
 import constants as c
 import plot_functions
-
-import tensorflow as tf
-from tensorflow import keras
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.wrappers.scikit_learn import KerasRegressor
-from sklearn.preprocessing import MinMaxScaler
-
-import constants as c
 import binning
 
 suffix = f"{c.NxbinsInSig}_{c.NybinsInSig}_{c.n_mhhbins}"
