@@ -9,7 +9,9 @@ import constants as c
 import plot_functions
 import binning
 
+
 suffix = f"{c.NxbinsInSig}_{c.NybinsInSig}_{c.n_mhhbins}"
+
 
 def get_kriging_suffix(uk_kwargs):
     suffix = ""

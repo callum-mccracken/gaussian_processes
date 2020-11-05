@@ -180,15 +180,6 @@ def get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=None):
 
 if __name__ == "__main__":
     """
-    variogram_parameters = 
-            # linear
-               {'slope': slope, 'nugget': nugget}
-            # power
-               {'scale': scale, 'exponent': exponent, 'nugget': nugget}
-            # gaussian, spherical, exponential and hole-effect:
-               {'sill': s, 'range': r, 'nugget': n}
-               # OR
-               {'psill': p, 'range': r, 'nugget': n}
     nlags = integer, default 6
     weight = bool, default False
     drift_terms : list of strings, optional
@@ -202,11 +193,12 @@ if __name__ == "__main__":
     NTag = 4
     n_indices = None
     x, y, z = deal_with_files.load_1d(NTag=NTag)
-    
-    for ev in [True, False]:
-        for vm in ["linear", "power", "gaussian", "spherical", "exponential", "hole-effect"]:
-            uk_kwargs = {
-                "variogram_model": vm,
-                'exact_values': ev
-            }
-            zpred, variance = get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=n_indices)
+    for s in [800,900,1000,1100]:
+        for r in [20,40,60,80,100,120,140,160]:
+            for n in [1e-12, 1e-11,1e-10,1e-9,1e-8]:
+                uk_kwargs = {
+                    "variogram_model": "gaussian",
+                    'exact_values': True,
+                    'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
+                }
+                zpred, variance = get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=n_indices)
