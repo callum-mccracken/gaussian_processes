@@ -24,6 +24,14 @@ import binning
 
 suffix = f"{c.NxbinsInSig}_{c.NybinsInSig}_{c.n_mhhbins}"
 
+def get_kriging_suffix(uk_kwargs):
+    suffix = ""
+    if uk_kwargs is None:
+        return "none"
+    else:
+        for var in sorted(uk_kwargs.keys()):
+            suffix += str(uk_kwargs[var])
+        return suffix
 
 # Have function to integrate mhh in each bin of the fullmassplane
 def integrate_mhh(df):
@@ -66,26 +74,51 @@ def create_mesh(NTag=4):
     xmesh = np.array(modeldffmp["mh1"]).reshape(shape).transpose()
     ymesh = np.array(modeldffmp["mh2"]).reshape(shape).transpose()
     hmesh = np.array(modeldffmp["pdf"]).reshape(shape).transpose()
-
-    with open(f"data/xmesh_{suffix}.p",'wb') as xfile:
+    if not os.path.exists(f"data{c.bin_sizes}"):
+        os.mkdir(f"data{c.bin_sizes}")
+    with open(f"data{c.bin_sizes}/xmesh_{suffix}.p",'wb') as xfile:
         pickle.dump(xmesh,xfile)
-    with open(f"data/ymesh_{suffix}.p",'wb') as yfile:
+    with open(f"data{c.bin_sizes}/ymesh_{suffix}.p",'wb') as yfile:
         pickle.dump(ymesh,yfile)
-    with open(f"data/hmesh_{NTag}tag_{suffix}.p",'wb') as hfile:
+    with open(f"data{c.bin_sizes}/hmesh_{NTag}tag_{suffix}.p",'wb') as hfile:
         pickle.dump(hmesh,hfile)
-    with open(f"data/hmesh_{NTag}tag_{suffix}.p",'rb') as hfile:
-        hmesh = pickle.load(hfile)
 
 def load_mesh(NTag=4, bins=None):
-    if not os.path.exists(f'data/hmesh_{NTag}tag_{suffix}.p'):
+    if not os.path.exists(f'data{c.bin_sizes}/hmesh_{NTag}tag_{suffix}.p'):
         create_mesh(NTag)
-    with open(f'data/xmesh_{suffix}.p', 'rb') as xfile:
+    with open(f'data{c.bin_sizes}/xmesh_{suffix}.p', 'rb') as xfile:
         xmesh = pickle.load(xfile)
-    with open(f'data/ymesh_{suffix}.p', 'rb') as yfile:
+    with open(f'data{c.bin_sizes}/ymesh_{suffix}.p', 'rb') as yfile:
         ymesh = pickle.load(yfile)
-    with open(f"data/hmesh_{NTag}tag_{suffix}.p",'rb') as hfile:
+    with open(f"data{c.bin_sizes}/hmesh_{NTag}tag_{suffix}.p",'rb') as hfile:
         hmesh = pickle.load(hfile)
     return xmesh, ymesh, hmesh
+
+def load_kriging(NTag, uk_kwargs):
+    suffix = get_kriging_suffix(uk_kwargs)
+    zfilename = f"data{c.bin_sizes}/kriging_{suffix}_{NTag}b_z.p"
+    vfilename = f"data{c.bin_sizes}/kriging_{suffix}_{NTag}b_v.p"
+    if os.path.exists(zfilename) and os.path.exists(vfilename):
+        with open(zfilename, 'rb') as zfile:
+            zpred_grid = pickle.load(zfile)
+        with open(vfilename, 'rb') as vfile:
+            var_grid = pickle.load(vfile)
+        print('successfully loaded files from')
+        print(zfilename)
+        print(vfilename)
+        return zpred_grid, var_grid
+    else:
+        return None, None
+
+def save_kriging(NTag, uk_kwargs, zpred_grid, variance_grid, n_indices=None):
+    suffix = get_kriging_suffix(uk_kwargs)
+    file_title = f"kriging_{suffix}_{NTag}b"
+    if n_indices is not None:
+        file_title += f"_n{n_indices}"
+    with open(f"data{c.bin_sizes}/{file_title}_z.p", 'wb') as zfile:
+        pickle.dump(zpred_grid, zfile)
+    with open(f"data{c.bin_sizes}/{file_title}_v.p", 'wb') as vfile:
+        pickle.dump(variance_grid, vfile)
 
 def load_1d(NTag=4):
     xmesh, ymesh, hmesh = load_mesh(NTag)

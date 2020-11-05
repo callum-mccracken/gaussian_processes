@@ -25,9 +25,11 @@ symin, symax = 94.82, 130.95
 # The main tunable bin size parameters
 # Fit is pretty sensitive to this. Worth experimenting.
 # Hypothesis: NN should do well with a very large number of bins
-NxbinsInSig = 25
-NybinsInSig = 25
+NxbinsInSig = 10
+NybinsInSig = 10
 n_mhhbins = 20
+bin_sizes = f"_{NxbinsInSig}_{NybinsInSig}_{n_mhhbins}"
+
 
 # bins for m_HH histogram
 mhhbins = np.linspace(200,1000,n_mhhbins)

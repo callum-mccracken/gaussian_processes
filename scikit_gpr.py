@@ -52,7 +52,7 @@ axes[1].pcolormesh(X0p, X1p, Zp)
 axes[1].set_title(f'GPs, Kernel = C{C_var} * R{RBF_var}')
 axes[0].pcolormesh(xmesh, ymesh, hmesh)
 axes[0].set_title('Data')
-plt.savefig(f'figures/gp_prediction_{NTag}tag.png')
+plt.savefig(f'figures{c.bin_sizes}/gp_prediction_{NTag}tag.png')
 #plt.show()
 
 with open('Zp.p', 'wb') as zfile:

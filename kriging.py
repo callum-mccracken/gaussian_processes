@@ -5,6 +5,8 @@ Ordinary Kriging Example
 First we will create a 2D dataset together with the associated x, y grids.
 
 """
+import matplotlib as mpl
+mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 import numpy as np
 import pykrige.kriging_tools as kt
@@ -13,18 +15,12 @@ import matplotlib.pyplot as plt
 import os
 
 import deal_with_files
+from deal_with_files import get_kriging_suffix
 import constants as c
 import binning
 
-def get_suffix(uk_kwargs):
-    suffix = ""
-    if uk_kwargs is None:
-        return "none"
-    else:
-        for var in sorted(uk_kwargs.keys()):
-            suffix += str(uk_kwargs[var])
-        return suffix
-
+if not os.path.exists(f"figures{c.bin_sizes}/"):
+    os.mkdir(f"figures{c.bin_sizes}/")
 
 def plot_variance(vmesh, NTag, show=False, uk_kwargs=None):
     """
@@ -35,13 +31,12 @@ def plot_variance(vmesh, NTag, show=False, uk_kwargs=None):
     fig, ax = plt.subplots()
     im = ax.pcolormesh(xmesh, ymesh, vmesh, shading='auto')
     fig.colorbar(im, ax=ax)
-    suffix = get_suffix(uk_kwargs)
+    suffix = get_kriging_suffix(uk_kwargs)
     plt.title(f'GP estimator variance, NTag={NTag}, {suffix}')
-    plt.savefig(f"figures/kriging_variance_{suffix}_{NTag}b.png")
+    plt.savefig(f"figures{c.bin_sizes}/kriging_variance_{suffix}_{NTag}b.png")
     if show:
         plt.show()
-    else:
-        plt.cla();plt.clf()
+    plt.close()
 
 def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None):
     fig, ax = plt.subplots()
@@ -49,7 +44,7 @@ def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None)
     im = ax.pcolormesh(gridx, gridy, zpred_grid, shading='auto')
     fig.colorbar(im, ax=ax)
 
-    suffix = get_suffix(uk_kwargs)
+    suffix = get_kriging_suffix(uk_kwargs)
     fig_title = f'GPR Output, NTag={NTag}, {suffix}'
     file_title = f"kriging_{suffix}_{NTag}b"
     if n_indices is not None:
@@ -57,11 +52,10 @@ def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None)
         file_title += f"_n{n_indices}"
 
     plt.title(fig_title)
-    plt.savefig("figures/"+file_title+".png")
+    plt.savefig(f"figures{c.bin_sizes}/{file_title}.png")
     if show:
         plt.show()
-    else:
-        plt.cla();plt.clf()
+    plt.close()
 
 
 def krige(NTag, x, y, z, n_indices=None, show=False, uk_kwargs=None):
@@ -173,27 +167,13 @@ def krige(NTag, x, y, z, n_indices=None, show=False, uk_kwargs=None):
 
     ###########################################################################
     # save z preds and variance so we can play with them later
-    suffix = get_suffix(uk_kwargs)
-    file_title = f"kriging_{suffix}_{NTag}b"
-    if n_indices is not None:
-        file_title += f"_n{n_indices}"
-    with open("data/"+file_title+'_z.p', 'wb') as zfile:
-        pickle.dump(zpred_grid, zfile)
-    with open("data/"+file_title+'_v.p', 'wb') as vfile:
-        pickle.dump(variance_grid, vfile)
+    deal_with_files.save_kriging(NTag, uk_kwargs, zpred_grid, variance_grid)
 
     return zpred_grid, variance_grid
 
-def get_kriging_prediction(NTag, x, y, z, n_indices=None, uk_kwargs=None):
-    suffix = get_suffix(uk_kwargs)
-    zfilename = f"data/kriging_{suffix}_{NTag}b_z.p"
-    vfilename = f"data/kriging_{suffix}_{NTag}b_v.p"
-    if os.path.exists(zfilename) and os.path.exists(vfilename):
-        with open(zfilename, 'rb') as zfile:
-            zpred_grid = pickle.load(zfile)
-        with open(vfilename, 'rb') as vfile:
-            var_grid = pickle.load(vfile)
-    else:
+def get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=None):
+    zpred_grid, var_grid = deal_with_files.load_kriging(NTag, uk_kwargs)
+    if zpred_grid is None:
         zpred_grid, var_grid = krige(
             NTag, x, y, z, n_indices=n_indices, uk_kwargs=uk_kwargs)
     return zpred_grid, var_grid
@@ -229,5 +209,4 @@ if __name__ == "__main__":
                 "variogram_model": vm,
                 'exact_values': ev
             }
-
-            zpred, variance = get_kriging_prediction(NTag, x, y, z, n_indices=n_indices, uk_kwargs=uk_kwargs)
+            zpred, variance = get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=n_indices)

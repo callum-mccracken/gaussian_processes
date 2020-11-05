@@ -55,8 +55,8 @@ def plot(x, y, h, name=None):
 def make_all_plots(method, ModelName=None, uk_kwargs=None):
 
     if method == "GP":
-        suffix = kriging.get_suffix(uk_kwargs)
-        ModelName = f"figures/kriging_{suffix}"
+        suffix = deal_with_files.get_kriging_suffix(uk_kwargs)
+        ModelName = f"figures{c.bin_sizes}/kriging_{suffix}"
     else:
         assert ModelName is not None
 
@@ -157,7 +157,7 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None):
     plt.close()
 
     # Plot mhh
-    fig,axs = plt.subplots(2,1)
+    fig,_ = plt.subplots(2,1)
     gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
     gs.update(hspace=0)
 
