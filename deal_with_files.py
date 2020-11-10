@@ -38,11 +38,11 @@ def integrate_fmp(df, mhhbins):
         row_list.append({"mhh":mhh,"pdf":sum(df.loc[df["mhh"]==mhh,"pdf"])})
     return pandas.DataFrame(row_list)
 
-def create_mesh(NTag=4):
+def create_mesh(NTag=4, pairagraph=False):
     print('creating mesh')
-    
+    pg = "PG_" if pairagraph else ""
     # pandas df with 3 columns: m_h1, m_h2, and m_hh
-    df = pandas.read_pickle(f"data/data_{NTag}tag.p")
+    df = pandas.read_pickle(f"data/{pg}data_{NTag}tag.p")
     print(len(df),"Events")
 
     # Now make the 3D histogram
@@ -63,30 +63,32 @@ def create_mesh(NTag=4):
     xmesh = np.array(modeldffmp["mh1"]).reshape(shape).transpose()
     ymesh = np.array(modeldffmp["mh2"]).reshape(shape).transpose()
     hmesh = np.array(modeldffmp["pdf"]).reshape(shape).transpose()
-    if not os.path.exists(f"data{c.bin_sizes}"):
-        os.mkdir(f"data{c.bin_sizes}")
-    with open(f"data{c.bin_sizes}/xmesh_{suffix}.p",'wb') as xfile:
+    if not os.path.exists(f"{pg}data{c.bin_sizes}"):
+        os.mkdir(f"{pg}data{c.bin_sizes}")
+    with open(f"{pg}data{c.bin_sizes}/{pg}xmesh_{suffix}.p",'wb') as xfile:
         pickle.dump(xmesh,xfile)
-    with open(f"data{c.bin_sizes}/ymesh_{suffix}.p",'wb') as yfile:
+    with open(f"{pg}data{c.bin_sizes}/{pg}ymesh_{suffix}.p",'wb') as yfile:
         pickle.dump(ymesh,yfile)
-    with open(f"data{c.bin_sizes}/hmesh_{NTag}tag_{suffix}.p",'wb') as hfile:
+    with open(f"{pg}data{c.bin_sizes}/{pg}hmesh_{NTag}tag_{suffix}.p",'wb') as hfile:
         pickle.dump(hmesh,hfile)
 
-def load_mesh(NTag=4, bins=None):
-    if not os.path.exists(f'data{c.bin_sizes}/hmesh_{NTag}tag_{suffix}.p'):
-        create_mesh(NTag)
-    with open(f'data{c.bin_sizes}/xmesh_{suffix}.p', 'rb') as xfile:
+def load_mesh(NTag=4, bins=None, pairagraph=False):
+    pg = "PG_" if pairagraph else ""
+    if not os.path.exists(f'{pg}data{c.bin_sizes}/{pg}hmesh_{NTag}tag_{suffix}.p'):
+        create_mesh(NTag, pairagraph=pairagraph)
+    with open(f'{pg}data{c.bin_sizes}/{pg}xmesh_{suffix}.p', 'rb') as xfile:
         xmesh = pickle.load(xfile)
-    with open(f'data{c.bin_sizes}/ymesh_{suffix}.p', 'rb') as yfile:
+    with open(f'{pg}data{c.bin_sizes}/{pg}ymesh_{suffix}.p', 'rb') as yfile:
         ymesh = pickle.load(yfile)
-    with open(f"data{c.bin_sizes}/hmesh_{NTag}tag_{suffix}.p",'rb') as hfile:
+    with open(f"{pg}data{c.bin_sizes}/{pg}hmesh_{NTag}tag_{suffix}.p",'rb') as hfile:
         hmesh = pickle.load(hfile)
     return xmesh, ymesh, hmesh
 
-def load_kriging(NTag, uk_kwargs):
+def load_kriging(NTag, uk_kwargs, pairagraph=False):
+    pg = "PG_" if pairagraph else ""
     suffix = get_kriging_suffix(uk_kwargs)
-    zfilename = f"data{c.bin_sizes}/kriging_{suffix}_{NTag}b_z.p"
-    vfilename = f"data{c.bin_sizes}/kriging_{suffix}_{NTag}b_v.p"
+    zfilename = f"{pg}data{c.bin_sizes}/{pg}kriging_{suffix}_{NTag}b_z.p"
+    vfilename = f"{pg}data{c.bin_sizes}/{pg}kriging_{suffix}_{NTag}b_v.p"
     if os.path.exists(zfilename) and os.path.exists(vfilename):
         with open(zfilename, 'rb') as zfile:
             zpred_grid = pickle.load(zfile)
@@ -99,18 +101,19 @@ def load_kriging(NTag, uk_kwargs):
     else:
         return None, None
 
-def save_kriging(NTag, uk_kwargs, zpred_grid, variance_grid, n_indices=None):
+def save_kriging(NTag, uk_kwargs, zpred_grid, variance_grid, n_indices=None, pairagraph=False):
+    pg = "PG_" if pairagraph else ""
     suffix = get_kriging_suffix(uk_kwargs)
-    file_title = f"kriging_{suffix}_{NTag}b"
+    file_title = f"{pg}kriging_{suffix}_{NTag}b"
     if n_indices is not None:
         file_title += f"_n{n_indices}"
-    with open(f"data{c.bin_sizes}/{file_title}_z.p", 'wb') as zfile:
+    with open(f"{pg}data{c.bin_sizes}/{file_title}_z.p", 'wb') as zfile:
         pickle.dump(zpred_grid, zfile)
-    with open(f"data{c.bin_sizes}/{file_title}_v.p", 'wb') as vfile:
+    with open(f"{pg}data{c.bin_sizes}/{file_title}_v.p", 'wb') as vfile:
         pickle.dump(variance_grid, vfile)
 
-def load_1d(NTag=4):
-    xmesh, ymesh, hmesh = load_mesh(NTag)
+def load_1d(NTag=4, pairagraph=False):
+    xmesh, ymesh, hmesh = load_mesh(NTag, pairagraph=pairagraph)
     return xmesh.flatten(), ymesh.flatten(), hmesh.flatten()
 
 if __name__ == "__main__":

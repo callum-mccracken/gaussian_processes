@@ -21,24 +21,29 @@ import binning
 
 if not os.path.exists(f"figures{c.bin_sizes}/"):
     os.mkdir(f"figures{c.bin_sizes}/")
+if not os.path.exists(f"PG_figures{c.bin_sizes}/"):
+    os.mkdir(f"PG_figures{c.bin_sizes}/")
 
-def plot_variance(vmesh, NTag, show=False, uk_kwargs=None):
+def plot_variance(xbins, ybins, vmesh, NTag, show=False, uk_kwargs=None, pairagraph=False):
     """
     vmesh: matrix, variance at each mesh point
     """
-    xmesh, ymesh = np.meshgrid(c.xbins, c.ybins)
+    pg = "PG_" if pairagraph else ""
+    xmesh, ymesh = np.meshgrid(xbins, ybins)
 
     fig, ax = plt.subplots()
     im = ax.pcolormesh(xmesh, ymesh, vmesh, shading='auto')
     fig.colorbar(im, ax=ax)
     suffix = get_kriging_suffix(uk_kwargs)
     plt.title(f'GP estimator variance, NTag={NTag}, {suffix}')
-    plt.savefig(f"figures{c.bin_sizes}/kriging_variance_{suffix}_{NTag}b.png")
+    plt.savefig(f"{pg}figures{c.bin_sizes}/kriging_variance_{suffix}_{NTag}b.png")
     if show:
         plt.show()
     plt.close()
 
-def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None):
+def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None, pairagraph=False):
+    pg = "PG_" if pairagraph else ""
+
     fig, ax = plt.subplots()
     gridx, gridy = np.meshgrid(xbins, ybins)
     im = ax.pcolormesh(gridx, gridy, zpred_grid, shading='auto')
@@ -46,7 +51,7 @@ def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None)
 
     suffix = get_kriging_suffix(uk_kwargs)
     fig_title = f'GPR Output, NTag={NTag}, {suffix}'
-    file_title = f"kriging_{suffix}_{NTag}b"
+    file_title = f"{pg}_kriging_{suffix}_{NTag}b"
     if n_indices is not None:
         fig_title += f" n_indices={n_indices}"
         file_title += f"_n{n_indices}"
@@ -58,7 +63,7 @@ def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None)
     plt.close()
 
 
-def krige(NTag, x, y, z, n_indices=None, show=False, uk_kwargs=None):
+def krige(NTag, x, y, z, n_indices=None, show=False, uk_kwargs=None, pairagraph=False):
     """
     Runs universal kriging on the x y z data generated earlier
 
@@ -151,8 +156,8 @@ def krige(NTag, x, y, z, n_indices=None, show=False, uk_kwargs=None):
     #gridy = np.arange(np.min(original_y), np.max(original_y)+1, y_grid_res)
     # or evaluate on the original points
 
-    xbins = list(sorted(set(x)))
-    ybins = list(sorted(set(y)))
+    xbins = np.linspace(min(x), max(x), 200)  # list(sorted(set(x)))
+    ybins = np.linspace(min(y), max(y), 200)  # list(sorted(set(y)))
 
     print(len(x))
     print(len(xbins))
@@ -162,20 +167,26 @@ def krige(NTag, x, y, z, n_indices=None, show=False, uk_kwargs=None):
 
     ###########################################################################
     # might as well plot while we're at it
-    plot_predictions(xbins, ybins, zpred_grid, NTag, show=show, uk_kwargs=uk_kwargs)
-    plot_variance(variance_grid, NTag, show=show, uk_kwargs=uk_kwargs)
+    plot_predictions(
+        xbins, ybins, zpred_grid, NTag,
+        show=show, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
+    plot_variance(
+        xbins, ybins, variance_grid, NTag,
+        show=show, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
 
     ###########################################################################
     # save z preds and variance so we can play with them later
-    deal_with_files.save_kriging(NTag, uk_kwargs, zpred_grid, variance_grid)
+    deal_with_files.save_kriging(
+        NTag, uk_kwargs, zpred_grid, variance_grid, pairagraph=pairagraph)
 
     return zpred_grid, variance_grid
 
-def get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=None):
-    zpred_grid, var_grid = deal_with_files.load_kriging(NTag, uk_kwargs)
+def get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=None, pairagraph=False):
+    zpred_grid, var_grid = deal_with_files.load_kriging(NTag, uk_kwargs, pairagraph=pairagraph)
     if zpred_grid is None:
         zpred_grid, var_grid = krige(
-            NTag, x, y, z, n_indices=n_indices, uk_kwargs=uk_kwargs)
+            NTag, x, y, z, n_indices=n_indices,
+            uk_kwargs=uk_kwargs, pairagraph=pairagraph)
     return zpred_grid, var_grid
 
 if __name__ == "__main__":
@@ -191,14 +202,18 @@ if __name__ == "__main__":
     print('loading x y z inputs')
 
     NTag = 4
+    pairagraph = True
     n_indices = None
-    x, y, z = deal_with_files.load_1d(NTag=NTag)
-    for s in [800,900,1000,1100]:
-        for r in [20,40,60,80,100,120,140,160]:
-            for n in [1e-12, 1e-11,1e-10,1e-9,1e-8]:
-                uk_kwargs = {
-                    "variogram_model": "gaussian",
-                    'exact_values': True,
-                    'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
-                }
-                zpred, variance = get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=n_indices)
+    x, y, z = deal_with_files.load_1d(NTag=NTag, pairagraph=pairagraph)
+    #for s in [800,900,1000,1100]:
+    #    for r in [20,40,60,80,100,120,140,160]:
+    #        for n in [1e-12, 1e-11,1e-10,1e-9,1e-8]:
+    s = 800
+    r = 160
+    n = 1e-8
+    uk_kwargs = {
+        "variogram_model": "gaussian",
+        'exact_values': True,
+        'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
+    }
+    zpred, variance = get_kriging_prediction(NTag, x, y, z, uk_kwargs, n_indices=n_indices, pairagraph=pairagraph)

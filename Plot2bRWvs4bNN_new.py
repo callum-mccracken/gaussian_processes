@@ -23,10 +23,10 @@ import kriging
 import deal_with_files
 
 # Have function to integrate mhh in each bin of the fullmassplane
-def integrate_mhh(df):
+def integrate_mhh(df, xbins, ybins):
     row_list = []
-    for xi in tqdm(c.xbins):
-        for yi in c.ybins:
+    for xi in tqdm(xbins):
+        for yi in ybins:
             row_list.append({"mh1":xi,"mh2":yi,"pdf":sum(df.loc[ (df["mh1"]==xi) & (df["mh2"]==yi),"pdf"])})
     return pandas.DataFrame(row_list)
 
@@ -37,8 +37,9 @@ def integrate_fmp(df):
         row_list.append({"mhh":mhh,"pdf":sum(df.loc[df["mhh"]==mhh,"pdf"])})
     return pandas.DataFrame(row_list)
 
-def plot(x, y, h, name=None):
+def plot(x, y, h, name=None, pairagraph=False):
     """plot a pcolormesh of h, at points given by x, y"""
+    pg = "_PG" if pairagraph else ""
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
@@ -47,25 +48,27 @@ def plot(x, y, h, name=None):
     plt.xlabel("$m_{h1}$")
     plt.ylabel("$m_{h2}$")
     if name is not None:
-        plt.savefig(name)
+        plt.savefig(pg + name)
     #plt.show()
     plt.close()
     return h
 
-def make_all_plots(method, ModelName=None, uk_kwargs=None):
-
+def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
+    pg = "PG_" if pairagraph else ""
     if method == "GP":
         suffix = deal_with_files.get_kriging_suffix(uk_kwargs)
-        ModelName = f"figures{c.bin_sizes}/kriging_{suffix}"
+        ModelName = f"{pg}figures{c.bin_sizes}/{pg}kriging_{suffix}"
     else:
         assert ModelName is not None
 
-    df = pandas.read_pickle("data/data_2tag_full.p")
+    df = pandas.read_pickle(f"data/{pg}data_2tag_full.p")
     coord_array = np.array(df[["m_h1","m_h2","m_hh"]])
     NORM = 1.0246291
     weights = NORM*np.array(df["NN_d24_weight_bstrap_med_17"])
+    xbins = np.linspace(min(c.xbins), max(c.xbins), 200)
+    ybins = np.linspace(min(c.ybins), max(c.ybins), 200)
     hist3d,[xbins,ybins,mhhbins] = np.histogramdd(
-        coord_array,[c.xbins,c.ybins,c.mhhbins],weights=weights)
+        coord_array,[xbins,ybins,c.mhhbins],weights=weights)
     xv,yv,zv = np.meshgrid(xbins[:-1],ybins[:-1],mhhbins[:-1],indexing='ij')
     grid_shape = (len(xbins),len(ybins))
 
@@ -99,7 +102,7 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None):
             binInSR(predicted_df["mh1"], predicted_df["mh2"])]
         predicted_mhh = list(integrate_fmp(predicted_df_SR)["pdf"])
 
-        predicted_fmp = integrate_mhh(predicted_df)
+        predicted_fmp = integrate_mhh(predicted_df, xbins, ybins)
         xmesh = np.array(predicted_fmp["mh1"]).reshape(grid_shape).transpose()
         ymesh = np.array(predicted_fmp["mh2"]).reshape(grid_shape).transpose()
         hmesh = np.array(predicted_fmp["pdf"]).reshape(grid_shape).transpose()
@@ -107,7 +110,7 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None):
         x = xv.flatten()
         y = yv.flatten()
         z = hist3d.flatten()
-        hmesh, _ = kriging.get_kriging_prediction(4, x, y, z, uk_kwargs=uk_kwargs)
+        hmesh, _ = kriging.get_kriging_prediction(4, x, y, z, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
         xmesh = xv[:,:,0]
         ymesh = yv[:,:,0]
 
@@ -135,7 +138,8 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None):
     plot(xmesh, ymesh, hT, name=ModelName+"_fullmassplane_4b_pred.png")
 
     # Plot 2b reweighted massplane
-    hmesh_2brw = np.array(integrate_mhh(data_df)["pdf"]).reshape((len(xbins),len(ybins))).transpose()
+    hmesh_2brw = np.array(integrate_mhh(
+        data_df, xbins, ybins)["pdf"]).reshape((len(xbins),len(ybins))).transpose()
     plot(xmesh, ymesh, hmesh_2brw.transpose()[:-1,:-1], name=ModelName+"_fullmassplane_2brw.png")
 
     # Plot the ratio
@@ -191,10 +195,16 @@ if __name__ == "__main__":
     method = 'GP'
     # model path for NN models, naming string for figures for kriging
     #ModelName = "models/model_20_288_384_416_512_192_30e_25x25_poisson"
-    for ev in [True, False]:
-        for vm in ["linear", "power", "gaussian", "spherical", "exponential", "hole-effect"]:
-            uk_kwargs = {
-                "variogram_model": vm,
-                'exact_values': ev
-            }
-            make_all_plots(method, uk_kwargs=uk_kwargs)
+    #for s in [800,900,1000,1100]:
+    #    for r in [20,40,60,80,100,120,140,160]:
+    #        for n in [1e-12, 1e-11,1e-10,1e-9,1e-8]:
+    s = 800
+    r = 160
+    n = 1e-8
+    pairagraph=True
+    uk_kwargs = {
+        "variogram_model": "gaussian",
+        'exact_values': True,
+        'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
+    }
+    make_all_plots(method, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
