@@ -53,11 +53,11 @@ def plot(x, y, h, name=None, pairagraph=False):
     plt.close()
     return h
 
-def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
+def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False, dim=2):
     pg = "PG_" if pairagraph else ""
     if method == "GP":
         suffix = deal_with_files.get_kriging_suffix(uk_kwargs)
-        ModelName = f"{pg}figures{c.bin_sizes}/{pg}kriging_{suffix}"
+        ModelName = f"{pg}figures{c.bin_sizes}/{pg}{dim}d_kriging_{suffix}"
     else:
         assert ModelName is not None
 
@@ -69,13 +69,13 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
     ybins = np.linspace(min(c.ybins), max(c.ybins), 200)
     hist3d,[xbins,ybins,mhhbins] = np.histogramdd(
         coord_array,[xbins,ybins,c.mhhbins],weights=weights)
-    xv,yv,zv = np.meshgrid(xbins[:-1],ybins[:-1],mhhbins[:-1],indexing='ij')
+    mh1,mh2,mhh = np.meshgrid(xbins[:-1],ybins[:-1],mhhbins[:-1],indexing='ij')
     grid_shape = (len(xbins),len(ybins))
 
     data_df = pandas.DataFrame()
-    data_df["mh1"] = xv.flatten()
-    data_df["mh2"] = yv.flatten()
-    data_df["mhh"] = zv.flatten()
+    data_df["mh1"] = mh1.flatten()
+    data_df["mh2"] = mh2.flatten()
+    data_df["mhh"] = mhh.flatten()
     data_df["pdf"] = hist3d.flatten()
 
     GridBins = data_df[["mh1","mh2","mhh"]]
@@ -95,7 +95,7 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
             scaler = pickle.load(open("MinMaxScaler2b4b.p",'rb'))
 
         # even if 2b4b model, we're only simulating NTag=4 at this point
-
+        # and only considering points within the SR
         predicted_df = GridBins
         predicted_df["pdf"] = model.predict(scaler.transform(GridBins), verbose=1)
         predicted_df_SR = predicted_df.loc[
@@ -107,12 +107,17 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
         ymesh = np.array(predicted_fmp["mh2"]).reshape(grid_shape).transpose()
         hmesh = np.array(predicted_fmp["pdf"]).reshape(grid_shape).transpose()
     elif method == "GP":
-        x = xv.flatten()
-        y = yv.flatten()
-        z = hist3d.flatten()
-        hmesh, _ = kriging.get_kriging_prediction(4, x, y, z, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
-        xmesh = xv[:,:,0]
-        ymesh = yv[:,:,0]
+        mh1_flat = mh1.flatten()
+        mh2_flat = mh2.flatten()
+        mhh_flat = mhh.flatten()
+        pdf_flat = hist3d.flatten()
+        if dim == 2:
+            hmesh, _ = kriging.get_kriging_prediction_2d(4, mh1_flat, mh2_flat, pdf_flat, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
+        if dim == 3:
+            hmesh, _ = kriging.get_kriging_prediction_3d(4, mh1_flat, mh2_flat, mhh_flat, pdf_flat, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
+
+        xmesh = mh1[:,:,0]
+        ymesh = mh2[:,:,0]
 
         hmesh_resized = np.empty((*hmesh.transpose().shape, c.n_mhhbins))
         mhh_counts = []
@@ -124,27 +129,32 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
             mhh_counts.append(count)
         mhh_counts = np.array(mhh_counts)
         predicted_df = pandas.DataFrame()
-        predicted_df["mh1"] = xv.flatten()
-        predicted_df["mh2"] = yv.flatten()
-        predicted_df["mhh"] = zv.flatten()
+        predicted_df["mh1"] = mh1_flat
+        predicted_df["mh2"] = mh2_flat
+        predicted_df["mhh"] = mhh_flat
         predicted_df["pdf"] = hmesh_resized[:-1,:-1,:-1].flatten()
         predicted_df_SR = predicted_df.loc[
             binInSR(predicted_df["mh1"], predicted_df["mh2"])]
 
-        predicted_mhh = mhh_counts*150
+        # for predicted massplane, scale
+        predicted_mhh = mhh_counts 
+
+
 
     # Plot predicted massplane
-    hT = hmesh.transpose()[:-1,:-1]
-    plot(xmesh, ymesh, hT, name=ModelName+"_fullmassplane_4b_pred.png")
+    plot(xmesh, ymesh, hmesh.transpose()[:-1,:-1], name=ModelName+"_fullmassplane_4b_pred.png")
 
     # Plot 2b reweighted massplane
     hmesh_2brw = np.array(integrate_mhh(
         data_df, xbins, ybins)["pdf"]).reshape((len(xbins),len(ybins))).transpose()
+
     plot(xmesh, ymesh, hmesh_2brw.transpose()[:-1,:-1], name=ModelName+"_fullmassplane_2brw.png")
 
     # Plot the ratio
+    massplane_scale_factor = np.sum(hmesh_2brw) / np.sum(hmesh)
+    hmesh *= massplane_scale_factor
     with np.errstate(divide='ignore', invalid='ignore'):
-        hmesh_ratio = hmesh/hmesh_2brw
+        hmesh_ratio = hmesh / hmesh_2brw
     hmesh_ratio[np.isnan(hmesh_ratio)] = 0
 
     fig = plt.figure()
@@ -161,6 +171,9 @@ def make_all_plots(method, ModelName=None, uk_kwargs=None, pairagraph=False):
     plt.close()
 
     # Plot mhh
+    mhh_scale_factor = sum(data_mhh) / sum(mhh_counts)
+    predicted_mhh *= mhh_scale_factor
+
     fig,_ = plt.subplots(2,1)
     gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
     gs.update(hspace=0)
@@ -201,10 +214,11 @@ if __name__ == "__main__":
     s = 800
     r = 160
     n = 1e-8
-    pairagraph=True
+    pairagraph=False
+    dim=2
     uk_kwargs = {
         "variogram_model": "gaussian",
         'exact_values': True,
         'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
     }
-    make_all_plots(method, uk_kwargs=uk_kwargs, pairagraph=pairagraph)
+    make_all_plots(method, uk_kwargs=uk_kwargs, pairagraph=pairagraph, dim=dim)

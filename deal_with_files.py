@@ -175,6 +175,7 @@ def load_kriging(NTag, uk_kwargs, dim, pairagraph=False):
         print(vfilename)
         return zpred_grid, var_grid
     else:
+        print('kriging files not found')
         return None, None
 
 def save_kriging(NTag, uk_kwargs, pdf_pred_grid, variance_grid, dim,

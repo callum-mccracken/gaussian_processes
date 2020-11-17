@@ -52,13 +52,13 @@ def plot_predictions(xbins, ybins, zpred_grid, NTag, show=False, uk_kwargs=None,
 
     suffix = get_kriging_suffix(uk_kwargs)
     fig_title = f'GPR Output, NTag={NTag}, {suffix}'
-    file_title = f"{pg}_kriging_{suffix}_{NTag}b"
+    file_title = f"{pg}kriging_{suffix}_{NTag}b"
     if n_indices is not None:
         fig_title += f" n_indices={n_indices}"
         file_title += f"_n{n_indices}"
 
     plt.title(fig_title)
-    plt.savefig(f"figures{c.bin_sizes}/{file_title}.png")
+    plt.savefig(f"{pg}figures{c.bin_sizes}/{file_title}.png")
     if show:
         plt.show()
     plt.close()
@@ -241,14 +241,9 @@ def krige_3d(NTag, mh1, mh2, mhh, pdf, n_indices=None, show=False, uk_kwargs=Non
     pdf_pred_grid, variance_grid = UK.execute("grid", mh1_bins, mh2_bins, mhh_bins)
 
     # convert to 2d for export
-    print(pdf_pred_grid.shape)
-    pdf_pred_grid = np.sum(pdf_pred_grid, axis=3)
-    print(pdf_pred_grid.shape)
-
-    print(variance_grid.shape)
-    variance_grid = np.sum(variance_grid, axis=3) # TODO: do we just sum these or do we sum with some kind of factor?
-    print(variance_grid.shape)
-
+    pdf_pred_grid = np.sum(pdf_pred_grid, axis=0)
+    variance_grid = np.sum(variance_grid, axis=0) # TODO: do we just sum these or do we sum with some kind of factor?
+    
     ###########################################################################
     # might as well plot while we're at it
     plot_predictions(
@@ -295,19 +290,24 @@ if __name__ == "__main__":
     print('loading x y z inputs')
 
     NTag = 4
-    dim = 3
+    dim = 2
     pairagraph = False
     n_indices = None
-    mh1, mh2, mhh, pdf = deal_with_files.load_flattened(NTag=NTag, pairagraph=pairagraph, dim=dim)
     #for s in [800,900,1000,1100]:
     #    for r in [20,40,60,80,100,120,140,160]:
     #        for n in [1e-12, 1e-11,1e-10,1e-9,1e-8]:
-    #s = 800
-    #r = 160
-    #n = 1e-8
+    s = 800
+    r = 160
+    n = 1e-8
     uk_kwargs = {
         "variogram_model": "gaussian",
         'exact_values': True,
-    #    'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
+        'variogram_parameters': {'sill': s, 'range': r, 'nugget': n}
     }
-    zpred, variance = get_kriging_prediction_3d(NTag, mh1, mh2, mhh, pdf, uk_kwargs, n_indices=n_indices, pairagraph=pairagraph)
+    
+    if dim == 3:
+        mh1, mh2, mhh, pdf = deal_with_files.load_flattened(NTag=NTag, pairagraph=pairagraph, dim=dim)
+        zpred, variance = get_kriging_prediction_3d(NTag, mh1, mh2, mhh, pdf, uk_kwargs, n_indices=n_indices, pairagraph=pairagraph)
+    else:
+        mh1, mh2, pdf = deal_with_files.load_flattened(NTag=NTag, pairagraph=pairagraph, dim=dim) 
+        zpred, variance = get_kriging_prediction_2d(NTag, mh1, mh2, pdf, uk_kwargs, n_indices=n_indices, pairagraph=pairagraph)
